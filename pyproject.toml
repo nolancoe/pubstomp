@@ -1,6 +1,6 @@
 [project]
 name = "pubstomp"
-version = "0.1.2"
+version = "0.1.3"
 description = "Advanced async pentesting toolkit with crawling, fuzzing, and reporting"
 authors = [
     { name="Nolan Coe", email="nolancoe@proton.me" }
