@@ -76,7 +76,7 @@ class SimpleSpider:
         self.logger = logging.getLogger(__name__)
         self.static_assets = []
         self.forms = []
-        self.xss_results = []  # New list to store XSS test results
+        self.xss_results = []
         self.rate_limited = False
         self.semaphore = asyncio.Semaphore(workers)
 
@@ -152,7 +152,7 @@ class SimpleSpider:
         results = []
         for payload in self.XSS_PAYLOADS:
             data = {input_field['name']: payload for input_field in inputs if input_field['name']}
-            if not data: # Skip forms with no named inputs
+            if not data:
                 xss_pbar.update(1)
                 continue
             try:
@@ -170,12 +170,12 @@ class SimpleSpider:
                             self.logger.info(f"XSS candidate: {payload} reflected in {action} (Status: {resp.status})")
                         else:
                             self.logger.debug(f"XSS test: {payload} not reflected in {action} (Status: {resp.status})")
-                else:  # GET
+                else:
                     params = urlencode(data)
                     test_url = f"{action}?{params}" if '?' not in action else f"{action}&{params}"
                     async with session.get(test_url, timeout=5, ssl=not self.no_verify_ssl) as resp:
                         content = await resp.text()
-                        status = "Ref reflected" if payload in content else "Not Reflected"
+                        status = "Reflected" if payload in content else "Not Reflected"
                         results.append({
                             'url': test_url,
                             'payload': payload,
@@ -195,7 +195,7 @@ class SimpleSpider:
                 })
                 self.logger.error(f"XSS test failed for {action}: {e}")
             xss_pbar.update(1)
-            await asyncio.sleep(self.delay)  # Respect rate limiting
+            await asyncio.sleep(self.delay)
         return results
 
     async def fuzz_url(self, session, word):
@@ -234,7 +234,11 @@ class SimpleSpider:
                 if resp.status >= 400:
                     return []
                 text = await resp.text()
-                disallowed = [line.strip() for line in text.splitlines() if line.startswith('Disallow:')]
+                disallowed = [
+                    line.split(':', 1)[1].strip()
+                    for line in text.splitlines()
+                    if line.lower().startswith('disallow:')
+                ]
                 self.logger.info(f"Found {len(disallowed)} disallowed paths in robots.txt")
                 return [path.lstrip('/') for path in disallowed if path.lstrip('/')]
         except (aiohttp.ClientError, asyncio.TimeoutError):
@@ -312,7 +316,7 @@ async def generate_report(target_dir, whatweb_file, nmap_file, fuzz_file, crawl_
         "crawl_results": crawl_results,
         "static_assets": [{"url": url, "mime_type": mime} for url, mime in static_assets],
         "forms": forms,
-        "xss_results": xss_results,  # Include XSS results
+        "xss_results": xss_results,
         "total_urls": len(fuzz_hits) + len(crawl_results) + len(static_assets)
     }
     report_file = os.path.join(target_dir, "report.json")
